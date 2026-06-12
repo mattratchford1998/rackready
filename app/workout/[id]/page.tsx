@@ -4,8 +4,11 @@ import {
   getSessionDetail,
   getUserSettings,
   getHistoryForExercise,
+  type LoggedSetRow,
 } from "@/lib/db";
+import type { Exercise, UserSettings } from "@/lib/types";
 import { recommendWeight, type RecommendResult } from "@/engine/recommend";
+import LogControl from "./log-control";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,34 @@ function prettyDate(iso: string): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function weightHint(ex: Exercise): string {
+  switch (ex.load_type) {
+    case "dumbbell":
+      return ex.unilateral ? "lb, one DB" : "lb each hand";
+    case "kettlebell":
+      return "lb, one KB";
+    case "bodyweight":
+      return "lb added";
+    default:
+      return "lb";
+  }
+}
+
+function prefillWeight(rec: RecommendResult, ex: Exercise, s: UserSettings): number {
+  if (rec.kind === "recommendation") return rec.weight;
+  if (rec.kind === "max_test") return Math.round(rec.e1rm);
+  switch (ex.load_type) {
+    case "dumbbell":
+      return s.available_dumbbells[0] ?? 0;
+    case "kettlebell":
+      return s.available_kettlebells[0] ?? 0;
+    case "bodyweight":
+      return 0;
+    default:
+      return s.barbell_weight;
+  }
 }
 
 export default async function WorkoutPage({
@@ -59,9 +90,15 @@ export default async function WorkoutPage({
           {cards.map(({ p, rec }) => (
             <Card
               key={p.id}
+              sessionId={detail.id}
+              prescribedId={p.id}
               name={p.exercise.display_name}
               prescription={`${p.sets} × ${p.reps}${p.rpe === null ? " · 1RM" : ` @ RPE ${p.rpe}`}`}
               rec={rec}
+              logged={p.logged}
+              prefillW={prefillWeight(rec, p.exercise, settings)}
+              prefillReps={p.reps}
+              hint={weightHint(p.exercise)}
             />
           ))}
         </div>
@@ -78,13 +115,25 @@ export default async function WorkoutPage({
 }
 
 function Card({
+  sessionId,
+  prescribedId,
   name,
   prescription,
   rec,
+  logged,
+  prefillW,
+  prefillReps,
+  hint,
 }: {
+  sessionId: string;
+  prescribedId: string;
   name: string;
   prescription: string;
   rec: RecommendResult;
+  logged: LoggedSetRow[];
+  prefillW: number;
+  prefillReps: number;
+  hint: string;
 }) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
@@ -109,6 +158,28 @@ function Card({
           </p>
         </div>
       )}
+
+      {logged.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-zinc-800 pt-3">
+          {logged.map((l) => (
+            <li key={l.id} className="text-xs text-zinc-400">
+              <span className="text-zinc-600">Set {l.set_number}</span> · {l.weight}×{l.reps}
+              {" · "}
+              {l.reps_in_reserve === 0 ? "to failure" : `${l.reps_in_reserve} in reserve`}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <LogControl
+        sessionId={sessionId}
+        prescribedId={prescribedId}
+        prefillWeight={prefillW}
+        prefillReps={prefillReps}
+        weightStep={5}
+        weightHint={hint}
+        setNumber={logged.length + 1}
+      />
     </div>
   );
 }

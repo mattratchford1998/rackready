@@ -70,6 +70,14 @@ export async function getTodaySession(date: string): Promise<{ id: string } | nu
   return data ? { id: data.id as string } : null;
 }
 
+export interface LoggedSetRow {
+  id: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+  reps_in_reserve: number;
+}
+
 export interface PrescribedWithExercise {
   id: string;
   order_index: number;
@@ -77,6 +85,7 @@ export interface PrescribedWithExercise {
   reps: number;
   rpe: number | null;
   exercise: Exercise;
+  logged: LoggedSetRow[];
 }
 
 export interface SessionDetail {
@@ -88,7 +97,9 @@ export interface SessionDetail {
 export async function getSessionDetail(id: string): Promise<SessionDetail | null> {
   const { data, error } = await db()
     .from("session")
-    .select("id, date, prescribed_exercise(id, order_index, sets, reps, rpe, exercise(*))")
+    .select(
+      "id, date, prescribed_exercise(id, order_index, sets, reps, rpe, exercise(*), logged_set(id, set_number, weight, reps, reps_in_reserve))"
+    )
     .eq("id", id)
     .single();
   if (error) {
@@ -96,8 +107,21 @@ export async function getSessionDetail(id: string): Promise<SessionDetail | null
     throw error;
   }
 
-  const prescriptions = (data.prescribed_exercise as unknown[] as PrescribedWithExercise[])
-    .map((p) => ({ ...p, rpe: p.rpe === null ? null : Number(p.rpe) }))
+  const prescriptions = (data.prescribed_exercise as unknown[] as (PrescribedWithExercise & {
+    logged_set: LoggedSetRow[];
+  })[])
+    .map((p) => ({
+      ...p,
+      rpe: p.rpe === null ? null : Number(p.rpe),
+      logged: (p.logged_set ?? [])
+        .map((l) => ({
+          ...l,
+          weight: Number(l.weight),
+          reps: Number(l.reps),
+          reps_in_reserve: Number(l.reps_in_reserve),
+        }))
+        .sort((a, b) => a.set_number - b.set_number),
+    }))
     .sort((a, b) => a.order_index - b.order_index);
 
   return { id: data.id as string, date: data.date as string, prescriptions };
@@ -120,4 +144,28 @@ export async function getHistoryForExercise(exerciseId: string): Promise<History
       reps_in_reserve: Number(row.reps_in_reserve),
     };
   });
+}
+
+// Record one performed set against a prescription. set_number is the next index.
+export async function logSet(
+  prescribedId: string,
+  weight: number,
+  reps: number,
+  reps_in_reserve: number
+): Promise<void> {
+  const client = db();
+  const { count, error: cErr } = await client
+    .from("logged_set")
+    .select("id", { count: "exact", head: true })
+    .eq("prescribed_id", prescribedId);
+  if (cErr) throw cErr;
+
+  const { error } = await client.from("logged_set").insert({
+    prescribed_id: prescribedId,
+    set_number: (count ?? 0) + 1,
+    weight,
+    reps,
+    reps_in_reserve,
+  });
+  if (error) throw error;
 }
