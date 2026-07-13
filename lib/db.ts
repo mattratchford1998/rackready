@@ -128,14 +128,17 @@ export async function getSessionDetail(id: string): Promise<SessionDetail | null
 }
 
 // All logged sets for one movement, across every session — the engine's input.
+// A known 1RM (if set) is folded in as a starting data point so recommendations
+// work before any real set is logged; it fades as real sessions accumulate.
 export async function getHistoryForExercise(exerciseId: string): Promise<HistorySet[]> {
-  const { data, error } = await db()
+  const client = db();
+  const { data, error } = await client
     .from("logged_set")
     .select("weight, reps, reps_in_reserve, prescribed_exercise!inner(exercise_id, session!inner(date))")
     .eq("prescribed_exercise.exercise_id", exerciseId);
   if (error) throw error;
 
-  return (data ?? []).map((row: Record<string, unknown>) => {
+  const history: HistorySet[] = (data ?? []).map((row: Record<string, unknown>) => {
     const pe = row.prescribed_exercise as { session: { date: string } };
     return {
       date: pe.session.date,
@@ -144,6 +147,58 @@ export async function getHistoryForExercise(exerciseId: string): Promise<History
       reps_in_reserve: Number(row.reps_in_reserve),
     };
   });
+
+  const { data: orm, error: oErr } = await client
+    .from("one_rep_max")
+    .select("weight, updated_at")
+    .eq("exercise_id", exerciseId)
+    .maybeSingle();
+  if (oErr) throw oErr;
+  if (orm) {
+    history.push({
+      date: String(orm.updated_at).slice(0, 10), // treated as a 1-rep, to-failure set
+      weight: Number(orm.weight),
+      reps: 1,
+      reps_in_reserve: 0,
+    });
+  }
+
+  return history;
+}
+
+export async function getOneRepMaxes(): Promise<Record<string, number>> {
+  const { data, error } = await db().from("one_rep_max").select("exercise_id, weight");
+  if (error) throw error;
+  const out: Record<string, number> = {};
+  for (const r of (data ?? []) as { exercise_id: string; weight: number }[]) {
+    out[r.exercise_id] = Number(r.weight);
+  }
+  return out;
+}
+
+export interface OneRepMaxEntry {
+  exercise_id: string;
+  weight: number | null; // null clears it
+}
+
+export async function saveOneRepMaxes(entries: OneRepMaxEntry[]): Promise<void> {
+  const client = db();
+  const now = new Date().toISOString();
+  const toUpsert = entries
+    .filter((e) => e.weight != null && e.weight > 0)
+    .map((e) => ({ exercise_id: e.exercise_id, weight: e.weight as number, updated_at: now }));
+  const toDelete = entries
+    .filter((e) => e.weight == null || !(e.weight > 0))
+    .map((e) => e.exercise_id);
+
+  if (toUpsert.length) {
+    const { error } = await client.from("one_rep_max").upsert(toUpsert, { onConflict: "exercise_id" });
+    if (error) throw error;
+  }
+  if (toDelete.length) {
+    const { error } = await client.from("one_rep_max").delete().in("exercise_id", toDelete);
+    if (error) throw error;
+  }
 }
 
 // Record one performed set against a prescription. set_number is the next index.

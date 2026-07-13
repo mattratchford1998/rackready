@@ -44,6 +44,9 @@ export default async function Home() {
           <Link href="/history" className="hover:text-zinc-300">
             History
           </Link>
+          <Link href="/maxes" className="hover:text-zinc-300">
+            Maxes
+          </Link>
           <Link href="/settings" className="hover:text-zinc-300">
             Settings
           </Link>

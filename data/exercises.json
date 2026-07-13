@@ -22,5 +22,10 @@
   { "id": "glute_bridge", "display_name": "Glute Bridge", "load_type": "bodyweight", "unilateral": false, "aliases": ["bw glute bridge", "bodyweight glute bridge"], "default_reps": 15 },
   { "id": "good_morning", "display_name": "Good Morning", "load_type": "barbell", "unilateral": false, "aliases": ["good mornings", "bb good morning"], "default_reps": 10 },
   { "id": "farmers_carry", "display_name": "Farmer's Carry", "load_type": "dumbbell", "unilateral": false, "aliases": ["farmers walk", "farmer carry", "farmer's walk", "kb farmers carry"], "default_reps": 40 },
-  { "id": "dip", "display_name": "Dip", "load_type": "bodyweight", "unilateral": false, "aliases": ["dips", "weighted dip", "tricep dip", "chest dip"], "default_reps": 8 }
+  { "id": "dip", "display_name": "Dip", "load_type": "bodyweight", "unilateral": false, "aliases": ["dips", "weighted dip", "tricep dip", "chest dip"], "default_reps": 8 },
+  { "id": "db_deadlift", "display_name": "Dumbbell Deadlift", "load_type": "dumbbell", "unilateral": false, "aliases": ["db deadlift", "dumbbell dl", "db dl"], "default_reps": 5 },
+  { "id": "db_squat", "display_name": "Dumbbell Squat", "load_type": "dumbbell", "unilateral": false, "aliases": ["db squat", "dumbbell squat", "db back squat"], "default_reps": 5 },
+  { "id": "db_romanian_deadlift", "display_name": "Dumbbell RDL", "load_type": "dumbbell", "unilateral": false, "aliases": ["db rdl", "dumbbell rdl", "db romanian deadlift", "db romanian dl"], "default_reps": 8 },
+  { "id": "db_push_press", "display_name": "Dumbbell Push Press", "load_type": "dumbbell", "unilateral": false, "aliases": ["db push press", "dumbbell push press", "db pp"], "default_reps": 5 },
+  { "id": "db_bent_over_row", "display_name": "Dumbbell Bent-Over Row", "load_type": "dumbbell", "unilateral": false, "aliases": ["db bent over row", "dumbbell bent-over row", "two arm db row", "2-arm db row", "bent over db row"], "default_reps": 8 }
 ]

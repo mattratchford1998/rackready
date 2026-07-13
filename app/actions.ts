@@ -5,7 +5,9 @@ import {
   createSession,
   logSet,
   updateUserSettings,
+  saveOneRepMaxes,
   type PrescribedItem,
+  type OneRepMaxEntry,
 } from "@/lib/db";
 import type { UserSettings } from "@/lib/types";
 
@@ -28,4 +30,10 @@ export async function saveSettings(settings: UserSettings): Promise<void> {
   await updateUserSettings(settings);
   revalidatePath("/settings");
   revalidatePath("/", "layout"); // recommendations depend on equipment
+}
+
+export async function saveMaxes(entries: OneRepMaxEntry[]): Promise<void> {
+  await saveOneRepMaxes(entries);
+  revalidatePath("/maxes");
+  revalidatePath("/", "layout"); // seeds recommendations
 }
