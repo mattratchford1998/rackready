@@ -17,17 +17,15 @@ export default async function Home() {
       <div className="w-full max-w-sm space-y-8 text-center">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-white">RackReady</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Tell me what to grab. I&apos;ll remember why.
-          </p>
         </div>
 
         <div className="space-y-3">
           <Link
             href="/new"
-            className="block w-full rounded-2xl bg-blue-600 py-5 text-lg font-bold text-white"
+            className="inline-block px-4 py-2 text-base font-bold text-zinc-950"
+            style={{ backgroundColor: "#8dfc82", borderRadius: "4px" }}
           >
-            + Enter today&apos;s workout
+            Enter today&apos;s workout
           </Link>
 
           {todaySession && (
