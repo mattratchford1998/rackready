@@ -16,6 +16,35 @@ interface Row {
 
 const RPE_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 
+// Decode any browser-renderable image (including iPhone HEIC, which Safari can
+// draw) and re-encode to a downscaled JPEG. Fixes unsupported formats and keeps
+// the base64 payload small enough for the serverless request-size limit.
+async function toDownscaledJpegBase64(file: File, maxDim = 1600, quality = 0.82): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("Couldn't read that image — try a JPEG or PNG."));
+      im.src = url;
+    });
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Couldn't process that image.");
+    ctx.drawImage(img, 0, 0, w, h);
+    const base64 = canvas.toDataURL("image/jpeg", quality).split(",")[1];
+    if (!base64) throw new Error("Couldn't process that image.");
+    return base64;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function NewWorkoutForm({
   exercises,
   today,
@@ -44,19 +73,14 @@ export default function NewWorkoutForm({
     setScanNote(null);
     setScanning(true);
     try {
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Could not read that image."));
-        reader.readAsDataURL(file);
-      });
-      const [, base64] = dataUrl.split(",");
-      const mediaType = dataUrl.slice(5, dataUrl.indexOf(";"));
+      // Re-encode to a downscaled JPEG in the browser: handles iPhone HEIC and
+      // keeps the upload well under serverless request-size limits.
+      const base64 = await toDownscaledJpegBase64(file);
 
       const res = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mediaType }),
+        body: JSON.stringify({ base64, mediaType: "image/jpeg" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not read that photo.");
