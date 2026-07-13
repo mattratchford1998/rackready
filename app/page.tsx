@@ -23,7 +23,7 @@ export default async function Home() {
           <Link
             href="/new"
             className="inline-block px-4 py-2 text-base font-bold text-zinc-950"
-            style={{ backgroundColor: "#8dfc82", borderRadius: "4px" }}
+            style={{ backgroundColor: "#8dfc82", borderRadius: "0px" }}
           >
             Enter today&apos;s workout
           </Link>
