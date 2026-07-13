@@ -95,10 +95,11 @@ export function recommendWeight(input: RecommendInput): RecommendResult {
 
   const caps = input.caps ?? defaultCapsFor(exercise.id);
   const lastLoad = isBodyweight(exercise) ? ls.weight + settings.bodyweight : ls.weight;
-  // A 1-rep max (a seeded known max or a tested single) isn't a comparable working
-  // set — don't let the progression cap anchor the working-weight recommendation to
-  // it. Caps resume normally once a real working set has been logged.
-  const capped = ls.reps <= 1 ? raw : applyProgressionCaps(raw, lastLoad, caps);
+  // A seeded baseline or a tested 1-rep max isn't a comparable working set — don't
+  // let the progression cap anchor the working-weight recommendation to it. Caps
+  // resume normally once a real working set has been logged.
+  const skipCap = ls.seed === true || ls.reps <= 1;
+  const capped = skipCap ? raw : applyProgressionCaps(raw, lastLoad, caps);
 
   const rounded = roundToEquipment(capped, exercise, settings);
 

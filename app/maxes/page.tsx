@@ -1,4 +1,4 @@
-import { getExercises, getOneRepMaxes } from "@/lib/db";
+import { getExercises, getBaselines, type Baseline } from "@/lib/db";
 import type { Exercise } from "@/lib/types";
 import MaxesForm from "./maxes-form";
 
@@ -10,11 +10,11 @@ const DUMBBELL = ["db_deadlift", "db_squat", "db_romanian_deadlift", "db_push_pr
 
 export default async function MaxesPage() {
   const exercises = await getExercises();
-  let initial: Record<string, number> = {};
+  let initial: Record<string, Baseline> = {};
   try {
-    initial = await getOneRepMaxes();
+    initial = await getBaselines();
   } catch {
-    // one_rep_max table not created yet (migration 003 not run) — show empty.
+    // one_rep_max table/reps column not present yet (migrations not run) — show empty.
   }
 
   const byId = new Map(exercises.map((e) => [e.id, e]));

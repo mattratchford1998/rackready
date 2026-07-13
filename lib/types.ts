@@ -75,6 +75,7 @@ export interface HistorySet {
   weight: number;
   reps: number;
   reps_in_reserve: number;
+  seed?: boolean;             // a seeded baseline (known rep-max), not a logged working set
 }
 
 export interface Recommendation {

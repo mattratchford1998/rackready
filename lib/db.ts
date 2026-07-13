@@ -150,43 +150,56 @@ export async function getHistoryForExercise(exerciseId: string): Promise<History
 
   const { data: orm, error: oErr } = await client
     .from("one_rep_max")
-    .select("weight, updated_at")
+    .select("weight, reps, updated_at")
     .eq("exercise_id", exerciseId)
     .maybeSingle();
   if (oErr) throw oErr;
   if (orm) {
+    // A rep-max baseline entered to failure — the engine turns it into an e1RM.
     history.push({
-      date: String(orm.updated_at).slice(0, 10), // treated as a 1-rep, to-failure set
+      date: String(orm.updated_at).slice(0, 10),
       weight: Number(orm.weight),
-      reps: 1,
+      reps: Number(orm.reps) || 1,
       reps_in_reserve: 0,
+      seed: true,
     });
   }
 
   return history;
 }
 
-export async function getOneRepMaxes(): Promise<Record<string, number>> {
-  const { data, error } = await db().from("one_rep_max").select("exercise_id, weight");
+export interface Baseline {
+  weight: number;
+  reps: number;
+}
+
+export async function getBaselines(): Promise<Record<string, Baseline>> {
+  const { data, error } = await db().from("one_rep_max").select("exercise_id, weight, reps");
   if (error) throw error;
-  const out: Record<string, number> = {};
-  for (const r of (data ?? []) as { exercise_id: string; weight: number }[]) {
-    out[r.exercise_id] = Number(r.weight);
+  const out: Record<string, Baseline> = {};
+  for (const r of (data ?? []) as { exercise_id: string; weight: number; reps: number }[]) {
+    out[r.exercise_id] = { weight: Number(r.weight), reps: Number(r.reps) || 1 };
   }
   return out;
 }
 
-export interface OneRepMaxEntry {
+export interface BaselineEntry {
   exercise_id: string;
   weight: number | null; // null clears it
+  reps: number;
 }
 
-export async function saveOneRepMaxes(entries: OneRepMaxEntry[]): Promise<void> {
+export async function saveBaselines(entries: BaselineEntry[]): Promise<void> {
   const client = db();
   const now = new Date().toISOString();
   const toUpsert = entries
     .filter((e) => e.weight != null && e.weight > 0)
-    .map((e) => ({ exercise_id: e.exercise_id, weight: e.weight as number, updated_at: now }));
+    .map((e) => ({
+      exercise_id: e.exercise_id,
+      weight: e.weight as number,
+      reps: Math.min(15, Math.max(1, Math.round(e.reps || 1))),
+      updated_at: now,
+    }));
   const toDelete = entries
     .filter((e) => e.weight == null || !(e.weight > 0))
     .map((e) => e.exercise_id);
