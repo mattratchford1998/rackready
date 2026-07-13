@@ -169,3 +169,52 @@ export async function logSet(
   });
   if (error) throw error;
 }
+
+// Overwrite the single settings row (id=1) with edited equipment.
+export async function updateUserSettings(s: UserSettings): Promise<void> {
+  const { error } = await db()
+    .from("user_settings")
+    .update({
+      bodyweight: s.bodyweight,
+      available_dumbbells: s.available_dumbbells,
+      available_kettlebells: s.available_kettlebells,
+      barbell_weight: s.barbell_weight,
+      plate_inventory: s.plate_inventory,
+    })
+    .eq("id", 1);
+  if (error) throw error;
+}
+
+export interface ExerciseHistory {
+  exercise: Exercise;
+  sets: HistorySet[]; // newest first
+}
+
+// Every logged set, grouped by movement — the history screen's input.
+export async function getAllHistory(): Promise<ExerciseHistory[]> {
+  const { data, error } = await db()
+    .from("logged_set")
+    .select(
+      "weight, reps, reps_in_reserve, prescribed_exercise!inner(exercise:exercise_id(*), session:session_id(date))"
+    );
+  if (error) throw error;
+
+  const groups = new Map<string, ExerciseHistory>();
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const pe = row.prescribed_exercise as { exercise: Exercise; session: { date: string } };
+    const ex = pe.exercise;
+    if (!ex) continue;
+    if (!groups.has(ex.id)) groups.set(ex.id, { exercise: ex, sets: [] });
+    groups.get(ex.id)!.sets.push({
+      date: pe.session.date,
+      weight: Number(row.weight),
+      reps: Number(row.reps),
+      reps_in_reserve: Number(row.reps_in_reserve),
+    });
+  }
+
+  const out = [...groups.values()];
+  for (const g of out) g.sets.sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
+  out.sort((a, b) => a.exercise.display_name.localeCompare(b.exercise.display_name));
+  return out;
+}

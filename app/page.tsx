@@ -39,6 +39,15 @@ export default async function Home() {
             </Link>
           )}
         </div>
+
+        <div className="flex justify-center gap-6 pt-2 text-sm text-zinc-500">
+          <Link href="/history" className="hover:text-zinc-300">
+            History
+          </Link>
+          <Link href="/settings" className="hover:text-zinc-300">
+            Settings
+          </Link>
+        </div>
       </div>
     </main>
   );
