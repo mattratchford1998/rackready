@@ -30,6 +30,70 @@ export default function NewWorkoutForm({
   ]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+
+  const known = new Set(exercises.map((e) => e.id));
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+
+    setError(null);
+    setScanNote(null);
+    setScanning(true);
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Could not read that image."));
+        reader.readAsDataURL(file);
+      });
+      const [, base64] = dataUrl.split(",");
+      const mediaType = dataUrl.slice(5, dataUrl.indexOf(";"));
+
+      const res = await fetch("/api/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, mediaType }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not read that photo.");
+
+      const scanned: Row[] = [];
+      const skipped: string[] = [];
+      for (const block of data.blocks ?? []) {
+        for (const ex of block.exercises ?? []) {
+          if (ex.canonical && known.has(ex.canonical)) {
+            scanned.push({
+              exercise_id: ex.canonical,
+              sets: ex.sets || 3,
+              reps: ex.reps || 5,
+              rpe: ex.rpe ?? 8,
+            });
+          } else {
+            skipped.push(ex.raw);
+          }
+        }
+      }
+      for (const u of data.unparsed ?? []) skipped.push(u);
+
+      if (scanned.length === 0) {
+        setError("Couldn't match any exercises from that photo — enter them by hand below.");
+      } else {
+        setRows(scanned);
+        if (data.detectedDate) setDate(data.detectedDate);
+      }
+      if (skipped.length > 0) {
+        setScanNote(`Skipped (add manually): ${skipped.join(", ")}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read that photo.");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   function update(i: number, patch: Partial<Row>) {
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -82,6 +146,26 @@ export default function NewWorkoutForm({
           <h1 className="text-lg font-bold text-white">New workout</h1>
           <span className="w-10" />
         </div>
+
+        <label className="block w-full">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhoto}
+            disabled={scanning}
+            className="hidden"
+          />
+          <span
+            className={`flex w-full items-center justify-center rounded-2xl border border-zinc-700 py-4 text-base font-semibold ${
+              scanning ? "text-zinc-500" : "text-zinc-100"
+            }`}
+          >
+            {scanning ? "Reading the board…" : "📷 Snap the board"}
+          </span>
+        </label>
+
+        {scanNote && <p className="text-xs text-amber-400">{scanNote}</p>}
 
         <label className="block">
           <span className="text-xs font-medium text-zinc-400">Date</span>
