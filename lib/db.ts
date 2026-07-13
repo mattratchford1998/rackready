@@ -258,9 +258,12 @@ export interface ExerciseHistory {
   sets: HistorySet[]; // newest first
 }
 
-// Every logged set, grouped by movement — the history screen's input.
+// Every logged set, grouped by movement — the history screen's input. A known
+// baseline (if set) is appended as the oldest "Starting baseline" anchor for
+// movements that have been trained.
 export async function getAllHistory(): Promise<ExerciseHistory[]> {
-  const { data, error } = await db()
+  const client = db();
+  const { data, error } = await client
     .from("logged_set")
     .select(
       "weight, reps, reps_in_reserve, prescribed_exercise!inner(exercise:exercise_id(*), session:session_id(date))"
@@ -281,8 +284,31 @@ export async function getAllHistory(): Promise<ExerciseHistory[]> {
     });
   }
 
+  // Fold baselines in as anchors, but only for movements already in the log.
+  const { data: orms, error: oErr } = await client
+    .from("one_rep_max")
+    .select("exercise_id, weight, reps, updated_at");
+  if (oErr) throw oErr;
+  for (const o of (orms ?? []) as { exercise_id: string; weight: number; reps: number; updated_at: string }[]) {
+    const g = groups.get(o.exercise_id);
+    if (!g) continue;
+    g.sets.push({
+      date: String(o.updated_at).slice(0, 10),
+      weight: Number(o.weight),
+      reps: Number(o.reps) || 1,
+      reps_in_reserve: 0,
+      seed: true,
+    });
+  }
+
   const out = [...groups.values()];
-  for (const g of out) g.sets.sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
+  for (const g of out) {
+    // Newest workout first; the baseline anchor always sits at the bottom.
+    g.sets.sort((a, b) => {
+      if (!!a.seed !== !!b.seed) return a.seed ? 1 : -1;
+      return a.date < b.date ? 1 : -1;
+    });
+  }
   out.sort((a, b) => a.exercise.display_name.localeCompare(b.exercise.display_name));
   return out;
 }
